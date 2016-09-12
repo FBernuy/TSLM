@@ -35,7 +35,7 @@ transMat(end,end)=1;
 prob=ones(length(globalMap.ind),1);
 
 prob(1:end)=0.1/(length(globalMap.ind-1));
-prob(13)=0.9;
+prob(6)=0.99;
 prob=prob/sum(prob);
 
 out=0*comp2;
@@ -61,10 +61,10 @@ for I=1:N_part
 end;
 
 %% Particle Filter
-x_N=0.1; % Error proporcional de traslacion
+x_N=0.05; % Error proporcional de traslacion
 a_P=0.9; % Particle weight memory
 
-for I=80:length(mapSeg)
+for I=46:length(mapSeg)
     
     %Traslacion de particulas
     accum_w=0;
@@ -74,7 +74,7 @@ for I=80:length(mapSeg)
             particles(J).length = particles(J).length-globalMap.len(particles(J).id);
             particles(J).id=particles(J).id+1;
             if particles(J).id > length(globalMap.ind) 
-                particles(J).id=particles(J).id-length(globalMap.ind)
+                particles(J).id=particles(J).id-length(globalMap.ind);
             end;
         end;
         

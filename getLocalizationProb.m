@@ -32,13 +32,13 @@ function [ out , loc ] = getLocalizationProb( mapGT , mapSeg , len )
     prob=ones(length(globalMap.ind),1);
     
     prob(1:end)=0.1/(length(globalMap.ind-1));
-    prob(13)=0.9;
+    prob(7)=0.9;
     prob=prob/sum(prob);
     
     out=0*comp2;
     loc=0*comp2;
     
-    for I=80:length(mapSeg)
+    for I=49:length(mapSeg)
         obsp=1-comp2(:,I);
         obsp=obsp/sum(obsp);
         trans=transMat*prob;
