@@ -35,7 +35,7 @@ transMat(end,end)=1;
 prob=ones(length(globalMap.ind),1);
 
 prob(1:end)=0.1/(length(globalMap.ind-1));
-prob(6)=0.99;
+%prob(6)=0.99;
 prob=prob/sum(prob);
 
 out=0*comp2;
@@ -62,7 +62,7 @@ end;
 
 %% Particle Filter
 x_N=0.05; % Error proporcional de traslacion
-a_P=0.9; % Particle weight memory
+a_P=0.75; % Particle weight memory
 
 for I=46:length(mapSeg)
     
