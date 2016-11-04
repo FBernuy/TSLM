@@ -10,7 +10,7 @@ classdef ParticleLocalization < TopologicalLocalization
     
     methods
         function obj=ParticleLocalization(n_particles, map, initial_distribution)
-            obj.noise=0.5;
+            obj.noise=1.0;
             obj.map=map;
             obj.particles(n_particles).id=0;
             obj.particles(n_particles).length=0;
@@ -25,11 +25,11 @@ classdef ParticleLocalization < TopologicalLocalization
             
         end;
             
-        function pose=update(obj,SO)
+        function pose=update(obj,SO,dist)
             
-            obj.transition(SO.SF.d);
+            obj.transition(dist);
             for I=1:length(obj.particles)
-                obj.particles(I).weight=obj.particles(I).weight*SO.likelihood(obj.map,obj.particles(I).id);
+                obj.particles(I).weight=obj.particles(I).weight*SO.likelihood(obj.map,obj.particles(I).id,obj.particles(I).length);
             end;
             obj.normalize_weights();
             if true

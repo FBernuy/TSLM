@@ -21,7 +21,7 @@ classdef DirectObservation < SemanticObservation
             obj.bin_list([backgnd other])=true;
            
         end;
-        function prob=likelihood(obj,map,ind)
+        function prob=likelihood(obj,map,ind,len)
             prob=1-obj.SF.compare(map.nodes(ind),obj.bin_list);
         end
         function obj=add(obj,SF)

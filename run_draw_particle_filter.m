@@ -9,6 +9,9 @@ GTSM.setDistanceMapping(0.05);
 %GTSM.setThresholdMapping(0.15);
 
 for I=1:length(fcfm_2_features)
+    %if fcfm_2_features(I).d < 0.0003
+    %    fcfm_2_features(I).d=0;
+    %end;
     GTSM.addFrame(fcfm_2_features(I));
 end;
 
@@ -28,60 +31,83 @@ plot(lat,lon,'-ro')
 plot_google_map
 %% Localization
 
+v = VideoWriter('vid.avi');
+v.FrameRate=10;
+v.Quality=80;
+open(v);
+
 feats=fcfm_1_features;
-init_prob=zeros(1,length(GTSM)); init_prob(4)=1;%6
+init_prob=zeros(1,length(GTSM)); init_prob(1)=1;%6%4
 npart=50;
 PF=ParticleLocalization(npart, GTSM, init_prob);
 
 poses=zeros(1,length(feats)); conf=zeros(1,length(poses));
 
 DO=DirectObservation(SemanticFeature());
+%DO=LocalMapObservation(1.0);
+h_part(npart)=0;
+
+ clf;
+ hold on
+ h_map=plot(lat,lon,'-ro');
+ %plot_google_map
+ h_pos=0;
+
+ cc=0;
+ dist=0;
 for I=1:length(feats)
     clc;
     I
+    cc
     if feats(I).d < 0.0003
         feats(I).d=0;
     end;
     DO.add(feats(I));
-    if rem(I,5)
+    dist=dist+feats(I).d;
+    if ~rem(I,5)
        
-        temp_pose=PF.update(DO);
+        temp_pose=PF.update(DO,dist);
+        dist=0;
         poses(I)=temp_pose.id;
-        conf(I)=DO.likelihood(GTSM,poses(I));
-        %figure(2);
-        %clf;
-        
-        %figure(1);
-        clf;
-        hold on
-        plot(lat,lon,'-ro')
+        mean_len=sum([PF.particles([PF.particles(:).id] == poses(I)).length])/sum([PF.particles(:).id] == poses(I));
+        conf(I)=DO.likelihood(GTSM,poses(I),mean_len);
+        cc=conf(I);
         for J=1:npart
             if isempty(GTSM.nextNodes(PF.particles(J).id))
-                plot(GTSM.nodes(PF.particles(J).id).gps(2),GTSM.nodes(PF.particles(J).id).gps(1),'-bx', 'MarkerSize', 8, 'LineWidth',1);
+                h_part(J)=plot(GTSM.nodes(PF.particles(J).id).gps(2),GTSM.nodes(PF.particles(J).id).gps(1),'-bx', 'MarkerSize', 8, 'LineWidth',1);
             else
                 nid=GTSM.nextNodes(PF.particles(J).id);
                 nid=nid(1);
                 ratio=PF.particles(J).length/GTSM.nodes(PF.particles(J).id).d;
                 temp_gps=GTSM.nodes(PF.particles(J).id).gps*(1-ratio)+GTSM.nodes(nid).gps*ratio;
-                plot(temp_gps(2),temp_gps(1),'-bx', 'MarkerSize', 8, 'LineWidth',2);
+                h_part(J)=plot(temp_gps(2),temp_gps(1),'-bx', 'MarkerSize', 8, 'LineWidth',2);
             end;
-            
-            
         end;
         
         if isempty(GTSM.nextNodes(temp_pose.id))
-            plot([GTSM.nodes(temp_pose.id).gps(2)],[GTSM.nodes(temp_pose.id).gps(1)],'-yo', 'MarkerSize', 12, 'LineWidth',2);
+            h_pos=plot([GTSM.nodes(temp_pose.id).gps(2)],[GTSM.nodes(temp_pose.id).gps(1)],'-yo', 'MarkerSize', 12, 'LineWidth',2);
         else
             
-            plot([GTSM.nodes(temp_pose.id).gps(2) GTSM.nodes(temp_pose.id+1).gps(2)],[GTSM.nodes(temp_pose.id).gps(1) GTSM.nodes(temp_pose.id+1).gps(1)],'-yo', 'MarkerSize', 12, 'LineWidth',2);
+            h_pos=plot([GTSM.nodes(temp_pose.id).gps(2) GTSM.nodes(temp_pose.id+1).gps(2)],[GTSM.nodes(temp_pose.id).gps(1) GTSM.nodes(temp_pose.id+1).gps(1)],'-yo', 'MarkerSize', 12, 'LineWidth',2);
         end;
-        plot(feats(I).gps(2),feats(I).gps(1),'-kx', 'MarkerSize', 12, 'LineWidth',2);
+        h_loc=plot(feats(I).gps(2),feats(I).gps(1),'-kx', 'MarkerSize', 12, 'LineWidth',2);
         
         drawnow
         %plot_google_map
-        hold off
+        %F=getframe;
+        %writeVideo(v,F.cdata);
+        
+        for J=1:npart
+            delete(h_part(J));
+        end;
+        delete(h_loc);
+        delete(h_pos);
+        
+        
         
         DO=DirectObservation(SemanticFeature());
         
     end;
 end;
+hold off
+close(v);

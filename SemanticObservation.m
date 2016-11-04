@@ -3,11 +3,10 @@ classdef (Abstract) SemanticObservation
     %   Detailed explanation goes here
     
     properties (Abstract)
-        SF
     end
     
     methods (Abstract)
-        prob=likelihood(map,ind)
+        prob=likelihood(map,ind,len)
     end
     
 end
