@@ -11,6 +11,7 @@ classdef TopologicalSemanticMap < handle
         threshold_mapping;
         frame_counter;
         similarity;
+        bin_list;
     end
     
     methods
@@ -18,11 +19,15 @@ classdef TopologicalSemanticMap < handle
             obj.frame_mapping=0;
             obj.distance_mapping=0;
             obj.threshold_mapping=0;
-            obj.nodes=SemanticFeature();
+            obj.nodes=TSMNode();
             obj.frame_counter=0;
             obj.adjacency_list=[];
             obj.current_node=1;
             obj.similarity=0.0;
+            [ backgnd, flat, other ] = getCategoriesDefinition(  );
+            temp=SemanticFeature();
+            obj.bin_list=temp.h1==-1;
+            obj.bin_list([backgnd other])=true;
         end;
         function obj=setFrameMapping(obj,n_frames)
             obj.frame_mapping=n_frames;
@@ -44,7 +49,7 @@ classdef TopologicalSemanticMap < handle
         end;
         function obj=addNode(obj,feature,prev_ind)
             obj.current_node=length(obj.nodes)+1;
-            obj.nodes(obj.current_node)=SemanticFeature();
+            obj.nodes(obj.current_node)=TSMNode();
             obj.addAdjacency(prev_ind,obj.current_node);
             obj.nodes(obj.current_node).add(feature);
         end;
@@ -64,8 +69,14 @@ classdef TopologicalSemanticMap < handle
                 if obj.nodes(obj.current_node).d + feature.d <= obj.distance_mapping
                     obj.nodes(obj.current_node).add(feature);
                 else
+                    temp_f=SemanticFeature();
+                    temp_f.h1=feature.h1;
+                    temp_f.h2=feature.h2;
+                    temp_f.h3=feature.h3;
+                    temp_f.d=feature.d;
+                    temp_f.gps=feature.gps;
                     temp_dist=feature.d+obj.nodes(obj.current_node).d-obj.distance_mapping;
-                    feature.d=obj.distance_mapping-obj.nodes(obj.current_node).d;
+                    temp_f.d=obj.distance_mapping-obj.nodes(obj.current_node).d;
                     obj.nodes(obj.current_node).add(feature);
                     if ~isempty(obj.adjacency_list)
                         if sum(obj.adjacency_list(:,2)==obj.current_node,2)==1          % solo tiene un antecesor
@@ -75,17 +86,17 @@ classdef TopologicalSemanticMap < handle
                                 obj.current_node
                             end;
                             if sum(obj.adjacency_list(:,1)==ant)==1                     % el antecesor solo tiene un sucesor
-                                if obj.nodes(ant).compare(obj.nodes(obj.current_node)) < obj.similarity
-                                    obj.nodes(ant).compare(obj.nodes(obj.current_node))
+                                if obj.nodes(ant).compare(obj.nodes(obj.current_node),obj.bin_list) < obj.similarity
+                                    obj.nodes(ant).compare(obj.nodes(obj.current_node),obj.bin_list)
                                     obj.mergeNodes(ant,obj.current_node);
                                     obj.current_node=ant;
                                 end;
                             end;
                         end;
                     end;
-                    feature.d=temp_dist;
+                    temp_f.d=temp_dist;
                     obj.addNode(SemanticFeature(),obj.current_node);
-                    obj.nodes(obj.current_node).add(feature);
+                    obj.nodes(obj.current_node).add(temp_f);
                 end;
                 return;
             end;

@@ -3,10 +3,13 @@ classdef (Abstract) TopologicalLocalization < handle
     %   Detailed explanation goes here
     
     properties (Abstract)
+        map
+        pose
     end
     
     methods (Abstract)
-        pose=update(obj,SO)
+        pose=update(obj,SO,dist)
+        display(obj)
     end
     
 end

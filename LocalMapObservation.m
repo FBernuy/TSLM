@@ -10,11 +10,13 @@ classdef LocalMapObservation < SemanticObservation
     methods
         function obj=LocalMapObservation(len)
             obj.map=TopologicalSemanticMap();
-            obj.map.setThresholdMapping(0.15);
+            %obj.map.setThresholdMapping(0.4);
+            obj.map.setDistanceMapping(0.05);
+            %obj.map.setFrameMapping(20);
             obj.len=len;
         end;
         function prob=likelihood(obj,map,ind,len)
-            dist=0;
+            dist=1;
             
             % 1- Hacer una lista con TODOS los posibles paths de largo LEN.
             paths{1}=ind;
@@ -60,13 +62,14 @@ classdef LocalMapObservation < SemanticObservation
         
         function obj=add(obj,SF)
             obj.map.addFrame(SF);
-            while sum([obj.map.nodes(:).d]) ~= obj.len
+            while abs(sum([obj.map.nodes(:).d]) - obj.len) < 0.0001
                 obj.map.nodes(1).d= obj.map.nodes(1).d - (sum([obj.map.nodes(:).d])-obj.len);
                 if obj.map.nodes(1).d <= 0
                     obj.map.adjacency_list(obj.map.adjacency_list(:,1)==1 , :)=[];
                     obj.map.adjacency_list(obj.map.adjacency_list(:,2)==1 , :)=[];
                     obj.map.nodes(1)=[];
                     obj.map.adjacency_list=obj.map.adjacency_list-1;
+                    obj.map.current_node=obj.map.current_node-1;
                 end;
             end;
         end;
@@ -85,7 +88,7 @@ classdef LocalMapObservation < SemanticObservation
             while ind_loc > 0 && ind_path > 0
                 if l_map == l_loc
                     l=l+l_map;
-                    d= d + l_map * obj.map.nodes(ind_loc).compare( map.nodes(path(ind_path)) );
+                    d= d + l_map * obj.map.nodes(ind_loc).compare( map.nodes(path(ind_path)),obj.map.bin_list );
                     ind_loc = ind_loc-1;
                     l_loc = obj.map.nodes( ind_loc ).d;
                     ind_path = ind_path-1;
@@ -94,7 +97,7 @@ classdef LocalMapObservation < SemanticObservation
                 end;
                 if l_map < l_loc
                     l=l+l_map;
-                    d= d + l_map * obj.map.nodes(ind_loc).compare( map.nodes(path(ind_path)) );
+                    d= d + l_map * obj.map.nodes(ind_loc).compare( map.nodes(path(ind_path)),obj.map.bin_list );
                     l_loc=l_loc-l_map;
                     ind_path = ind_path-1;
                     if ind_path~=0
@@ -104,11 +107,13 @@ classdef LocalMapObservation < SemanticObservation
                 end;
                 if l_loc < l_map
                     l=l+l_loc;
-                    d= d + l_loc * obj.map.nodes(ind_loc).compare( map.nodes(path(ind_path)) );
+                    d= d + l_loc * obj.map.nodes(ind_loc).compare( map.nodes(path(ind_path)),obj.map.bin_list );
                     l_map=l_map-l_loc;
                     ind_loc = ind_loc-1;
                     if ind_loc~=0
-                        l_loc = map.nodes(ind_loc).d;
+                        if ind_loc > length(map.nodes)
+                        end;
+                        l_loc = obj.map.nodes(ind_loc).d;
                     end;
                     continue;
                 end;

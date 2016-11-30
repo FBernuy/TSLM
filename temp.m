@@ -63,7 +63,7 @@ end;
 
 %% PLOTEAR EL GPS
 
-ff=features_1;
+ff=fcfm_1_features;
 lat1=[];
 lon1=[];
 for I=1:length(ff)
@@ -71,7 +71,7 @@ for I=1:length(ff)
     lon1(I)=ff(I).gps(2);
 end;
 
-ff=features_2;
+ff=fcfm_2_features;
 lat2=[];
 lon2=[];
 for I=1:length(ff)
@@ -79,19 +79,19 @@ for I=1:length(ff)
     lon2(I)=ff(I).gps(2);
 end;
 
-ff=features_3;
-lat3=[];
-lon3=[];
-for I=1:length(ff)
-    lat3(I)=ff(I).gps(1);
-    lon3(I)=ff(I).gps(2);
-end;
+%ff=features_3;
+%lat3=[];
+%lon3=[];
+%for I=1:length(ff)
+%    lat3(I)=ff(I).gps(1);
+%    lon3(I)=ff(I).gps(2);
+%end;
 
+plot(lon2,lat2,...
+    '-g','LineWidth',6);
+hold on
 plot(lon1,lat1,...
-    '-g',...
-    lon2,lat2,...
     '-r',...
-    lon3,lat3,...
-    '-b',...
-    'LineWidth',4);
+    'LineWidth',3);
 plot_google_map
+set(gca,'position',[0 0 1 1],'units','normalized');
