@@ -57,7 +57,7 @@ classdef LocalMapObservation < SemanticObservation
                 dist=min(dist, compareToPath(obj,map,paths{I},len) );
             end;
             % 3- retornar 1-dist;
-            prob=1-dist;
+            prob=exp(-dist);
         end;
         
         function obj=add(obj,SF)

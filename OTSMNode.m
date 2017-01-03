@@ -1,5 +1,5 @@
-classdef TSMNode < SemanticFeature
-    %TSMNODE Summary of this class goes here
+classdef OTSMNode < OrientedSemanticFeature
+    %OTSMNODE Summary of this class goes here
     %   Detailed explanation goes here
     
     properties
@@ -7,12 +7,12 @@ classdef TSMNode < SemanticFeature
     end
     
     methods
-        function obj=TSMNode()
+        function obj=OTSMNode()
             obj.gps_list=[];
         end;
         function obj=add(obj,feature)
             pred=obj.d;
-            obj.add@SemanticFeature(feature);
+            obj.add@OrientedSemanticFeature(feature);
             posd=obj.d;
             if isempty(feature.gps)
                 return;

@@ -7,6 +7,7 @@ classdef ForwardLocalization < TopologicalLocalization
         distribution;
         h_pos;
         pose;
+        pose_p;
     end
     
     methods
@@ -17,9 +18,9 @@ classdef ForwardLocalization < TopologicalLocalization
             obj.h_pos = 0;
         end;
         function pose=update(obj,SO,dist)
-            dist=dist*1.5;
+            dist=dist*1.0;%5;
             obsp(length(obj.map.nodes))=0;
-            for I=1:length(obj.map.nodes)
+            parfor I=1:length(obj.map.nodes)
                 obsp(I)=0;
                 if isa(SO,'DirectObservation')
                     obsp(I)= SO.likelihood(obj.map,I,0);
@@ -32,22 +33,34 @@ classdef ForwardLocalization < TopologicalLocalization
             obsp=softmax(obsp')';%
             %obsp/sum(obsp);
             prob=obj.distribution;
+            trans_prob=dist./([(obj.map.nodes(:).d)]);
+            trans_prob(isnan(trans_prob))=0.9999;
+            trans_prob(trans_prob>=1)=0.9999;
+            trans_prob(trans_prob<=0.000001)=0.000001;
             for I=1:length(obj.map.nodes)
                 trans=0;
                 if isempty(obj.map.prevNodes(I))
                     trans=obj.distribution(I);
                 else
-                    trans=(obj.map.nodes(I).d/(obj.map.nodes(I).d+dist))*obj.distribution(I)+...
-                          (dist/(obj.map.nodes(I).d+dist))*mean(obj.distribution(obj.map.prevNodes(I)));
+                    if obj.map.nodes(I).d == 0
+                        trans=max(obj.distribution(obj.map.prevNodes(I)));
+                    else
+                        %trans=(obj.map.nodes(I).d/(obj.map.nodes(I).d+dist))*obj.distribution(I)+...
+                        %        (dist/(obj.map.nodes(I).d+dist))*max(obj.distribution(obj.map.prevNodes(I)));
+                        trans=(1-trans_prob(I))*obj.distribution(I)+max(trans_prob(obj.map.prevNodes(I)).*obj.distribution(obj.map.prevNodes(I)));
+                    end;
                 end;
-                prob(I)=trans*obsp(I);
+                 prob(I)=trans*obsp(I);
             end;
             prob=prob/sum(prob);
+            if any(isnan(prob))
+            end;
             obj.distribution=prob;
             
             [~,pose.id]=max(obj.distribution);
             pose.length=obj.map.nodes(pose.id).d/2;
             obj.pose=pose;
+            obj.pose_p=obj.distribution(obj.pose.id);
         end;
         function obj=display(obj)
             

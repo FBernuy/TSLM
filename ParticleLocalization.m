@@ -5,6 +5,7 @@ classdef ParticleLocalization < TopologicalLocalization
     properties
         particles; %.id / .length / .weight
         pose;
+        pose_p;
         map;
         noise;
         h_part;
@@ -37,18 +38,46 @@ classdef ParticleLocalization < TopologicalLocalization
         function pose=update(obj,SO,dist)
             
             obj.transition(dist);
+            %obj.forcedTransition(dist,SO);
+            if isa(SO,'DirectObservation') || isa(SO,'OrientedObservation')
+                temp_w=0*[obj.particles(:).weight];
+                tmp_uni=unique([obj.particles(:).id]);
+                tmp_like=0*tmp_uni;
+                for I=1:length(tmp_uni)
+                    tmp_find=find([obj.particles(:).id]==tmp_uni(I));
+                    temp_w(tmp_find)=[obj.particles(tmp_find).weight].*SO.likelihood(obj.map,tmp_uni(I),0);%Length doesnt matter in DO
+                end;
+            else
+                temp_w=[obj.particles(:).weight];
+                parfor I=1:length(obj.particles)
+                    temp_w(I)=obj.particles(I).weight*SO.likelihood(obj.map,obj.particles(I).id,obj.particles(I).length);
+                end;
+            end;
+            
             for I=1:length(obj.particles)
-                obj.particles(I).weight=obj.particles(I).weight*SO.likelihood(obj.map,obj.particles(I).id,obj.particles(I).length);
+                obj.particles(I).weight=temp_w(I);
             end;
             obj.normalize_weights();
-            if dist ~= 0 && obj.effectiveSampleSize() < length(obj.particles)/2
+            if dist ~= 0 && obj.effectiveSampleSize() < length(obj.particles)*0.75
                 display('resampling')
                 display(obj.effectiveSampleSize())
                 obj.resample();
             end
-            pose.id=mode([obj.particles(:).id]);
+            
+            [ux,ia,ic] = unique([obj.particles(:).id]);
+            counts=ux*0;
+            if length(ux) == 1, counts = length(obj.particles);
+            else
+                for I=1:length(ux)
+                    counts(I) = sum([obj.particles(ic==I).weight]);
+                end;
+            end
+            [a,b]=max(counts);
+            pose.id=ux(b);
+            %pose.id=mode([obj.particles(:).id]);
             pose.length=mean( [obj.particles( [obj.particles(:).id] == pose.id ).length] );
             obj.pose=pose;
+            obj.pose_p=a;
         end;
         
         function obj=resample(obj)
@@ -86,7 +115,8 @@ classdef ParticleLocalization < TopologicalLocalization
                     obj.particles(I).length=obj.map.nodes(obj.particles(I).id).d+obj.particles(I).length;
                     continue;
                 end;
-                if obj.particles(I).length > obj.map.nodes(obj.particles(I).id).d
+                
+                while obj.particles(I).length > obj.map.nodes(obj.particles(I).id).d
                     obj.particles(I).length=obj.particles(I).length-obj.map.nodes(obj.particles(I).id).d;
                     next_ids=obj.map.nextNodes(obj.particles(I).id);%obj.map.adjacency_list(obj.map.adjacency_list(:,1)==obj.particles(I).id,2);
                     if isempty(next_ids)
@@ -98,6 +128,54 @@ classdef ParticleLocalization < TopologicalLocalization
                         continue;
                     end;
                     obj.particles(I).id=randsample(next_ids,1);   %random next node
+                end;
+            end;
+        end;
+        
+        function obj=forcedTransition(obj,dist,SO)
+            
+            for I=1:length(obj.particles)
+                obj.particles(I).length = obj.particles(I).length + (dist) * normrnd(1.0,obj.noise*obj.noise);  %added noise!!!!
+                if obj.particles(I).length < 0
+                    prev_ids=obj.map.prevNodes(obj.particles(I).id);
+                    if isempty(prev_ids)
+                        obj.particles(I).length=0;
+                        continue;
+                    end;
+                    if length(prev_ids)==1
+                        obj.particles(I).id=prev_ids;
+                    else
+                        tmp_like=0;
+                        for J=1:length(prev_ids)
+                            tmp_like_2=SO.likelihood(obj.map,prev_ids(J),0);%Da lo mismo el largo!
+                            if tmp_like< tmp_like_2
+                                tmp_like = tmp_like_2;
+                                obj.particles(I).id=prev_ids(J);
+                            end;
+                        end;
+                    end;
+                    obj.particles(I).length=obj.map.nodes(obj.particles(I).id).d+obj.particles(I).length; %TODO: wut?
+                    continue;
+                end;
+                while obj.particles(I).length > obj.map.nodes(obj.particles(I).id).d
+                    obj.particles(I).length=obj.particles(I).length-obj.map.nodes(obj.particles(I).id).d;
+                    next_ids=obj.map.nextNodes(obj.particles(I).id);%obj.map.adjacency_list(obj.map.adjacency_list(:,1)==obj.particles(I).id,2);
+                    if isempty(next_ids)
+                        obj.particles(I).length=obj.map.nodes(obj.particles(I).id).d;
+                        continue;
+                    end;
+                    if length(next_ids)==1
+                        obj.particles(I).id=next_ids;
+                        continue;
+                    end;
+                    tmp_like=0;
+                    for J=1:length(next_ids)
+                        tmp_like_2=SO.likelihood(obj.map,next_ids(J),0);%Da lo mismo el largo!
+                        if tmp_like< tmp_like_2
+                            tmp_like = tmp_like_2;
+                            obj.particles(I).id=next_ids(J);
+                        end;
+                    end;
                 end;
             end;
         end;
@@ -124,13 +202,15 @@ classdef ParticleLocalization < TopologicalLocalization
                 end;
                 
                 if isempty(obj.map.nextNodes(obj.particles(J).id))
-                    obj.h_part(J)=plot(obj.map.nodes(obj.particles(J).id).gps(2),obj.map.nodes(obj.particles(J).id).gps(1),'-bx', 'MarkerSize', 8, 'LineWidth',1);
+                    obj.h_part(J)=plot(obj.map.nodes(obj.particles(J).id).gps(2),obj.map.nodes(obj.particles(J).id).gps(1),'-gx', 'MarkerSize', 8, 'LineWidth',1);
                 else
                     nid=obj.map.nextNodes(obj.particles(J).id);
                     nid=nid(1);
                     ratio=obj.particles(J).length/obj.map.nodes(obj.particles(J).id).d;
+                    if  nid <= 0 || obj.particles(J).id <=0
+                    end;
                     temp_gps=obj.map.nodes(obj.particles(J).id).gps*(1-ratio)+obj.map.nodes(nid).gps*ratio;
-                    obj.h_part(J)=plot(temp_gps(2),temp_gps(1),'-bx', 'MarkerSize', 8, 'LineWidth',2);
+                    obj.h_part(J)=plot(temp_gps(2),temp_gps(1),'-gx', 'MarkerSize', 8, 'LineWidth',2);
                 end;
                 
             end;
@@ -144,6 +224,15 @@ classdef ParticleLocalization < TopologicalLocalization
                 obj.h_pos=plot([obj.map.nodes(obj.pose.id).gps(2) obj.map.nodes(obj.pose.id+1).gps(2)],[obj.map.nodes(obj.pose.id).gps(1) obj.map.nodes(obj.pose.id+1).gps(1)],'-yo', 'MarkerSize', 12, 'LineWidth',2);
             end;
             
+        end;
+        
+        function obj=particlesReset(obj)
+            for I=1:length(obj.particles)
+                obj.particles(I).id=randi(length(obj.map.nodes));
+                obj.particles(I).length=rand * obj.map.nodes(obj.particles(I).id).d;
+                obj.particles(I).weight=1;
+            end;
+            obj.normalize_weights();
         end;
     end
     

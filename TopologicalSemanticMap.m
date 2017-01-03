@@ -12,14 +12,19 @@ classdef TopologicalSemanticMap < handle
         frame_counter;
         similarity;
         bin_list;
+        is_oriented;
     end
     
     methods
-        function obj=TopologicalSemanticMap()
+        function obj=TopologicalSemanticMap(is_oriented)
             obj.frame_mapping=0;
             obj.distance_mapping=0;
             obj.threshold_mapping=0;
-            obj.nodes=TSMNode();
+            if ~is_oriented
+                obj.nodes=TSMNode();
+            else
+                obj.nodes=OTSMNode();
+            end;
             obj.frame_counter=0;
             obj.adjacency_list=[];
             obj.current_node=1;
@@ -28,6 +33,7 @@ classdef TopologicalSemanticMap < handle
             temp=SemanticFeature();
             obj.bin_list=temp.h1==-1;
             obj.bin_list([backgnd other])=true;
+            obj.is_oriented=is_oriented;
         end;
         function obj=setFrameMapping(obj,n_frames)
             obj.frame_mapping=n_frames;
@@ -45,13 +51,21 @@ classdef TopologicalSemanticMap < handle
             obj.threshold_mapping=threshold;
         end;
         function obj=addAdjacency(obj,from_ind,to_ind)
-            obj.adjacency_list(end+1,:)=[from_ind to_ind];
+           obj.adjacency_list(end+1,:)=[from_ind to_ind];
         end;
         function obj=addNode(obj,feature,prev_ind)
             obj.current_node=length(obj.nodes)+1;
-            obj.nodes(obj.current_node)=TSMNode();
-            obj.addAdjacency(prev_ind,obj.current_node);
-            obj.nodes(obj.current_node).add(feature);
+            if ~obj.is_oriented
+                obj.nodes(obj.current_node)=TSMNode();
+            else
+                obj.nodes(obj.current_node)=OTSMNode();
+            end;
+            if ~isempty(feature)
+                obj.nodes(obj.current_node).add(feature);
+            end;
+            if ~isempty(prev_ind)
+                obj.addAdjacency(prev_ind,obj.current_node);
+            end;
         end;
         function obj=addFrame(obj,feature)
             if obj.frame_mapping~=0      %%Frame Mapping
@@ -69,7 +83,12 @@ classdef TopologicalSemanticMap < handle
                 if obj.nodes(obj.current_node).d + feature.d <= obj.distance_mapping
                     obj.nodes(obj.current_node).add(feature);
                 else
-                    temp_f=SemanticFeature();
+                    if ~obj.is_oriented
+                        temp_f=SemanticFeature();
+                    else
+                        temp_f=OrientedSemanticFeature();
+                        temp_f.orientation=0;
+                    end;
                     temp_f.h1=feature.h1;
                     temp_f.h2=feature.h2;
                     temp_f.h3=feature.h3;
@@ -95,7 +114,11 @@ classdef TopologicalSemanticMap < handle
                         end;
                     end;
                     temp_f.d=temp_dist;
-                    obj.addNode(SemanticFeature(),obj.current_node);
+                    if ~obj.is_oriented
+                        obj.addNode(SemanticFeature(),obj.current_node);
+                    else
+                        obj.addNode(OrientedSemanticFeature(),obj.current_node);
+                    end;
                     obj.nodes(obj.current_node).add(temp_f);
                 end;
                 return;
@@ -148,6 +171,16 @@ classdef TopologicalSemanticMap < handle
         end;
         function pid=prevNodes(obj,id)
             pid=obj.adjacency_list(obj.adjacency_list(:,2) == id , 1);
+        end;
+        function h=display(obj)
+            h(length(obj.nodes)+1)=0;
+            hold on
+            for I=1:length(obj.nodes)
+                h(I)=obj.nodes(I).display();
+            end;
+            poss=[obj.nodes.gps];
+            h(end)=plot(poss(2:2:end),poss(1:2:end),'or');
+            hold off
         end;
     end
     
