@@ -11,6 +11,8 @@ classdef ParticleLocalization < TopologicalLocalization
         h_part;
         h_map;
         h_pos=0;
+        h_mp;
+        metric_pose;
     end
     
     methods
@@ -22,6 +24,8 @@ classdef ParticleLocalization < TopologicalLocalization
             obj.h_part(n_particles)=0;
             obj.h_map=0;
             obj.h_pos=0;
+            obj.metric_pose=[];
+            h_mp=0;
             for I=1:n_particles
                 obj.particles(I).id=find(rand <= cumsum(initial_distribution),1);
                 obj.particles(I).length=rand * map.nodes(obj.particles(I).id).d;
@@ -78,6 +82,7 @@ classdef ParticleLocalization < TopologicalLocalization
             pose.length=mean( [obj.particles( [obj.particles(:).id] == pose.id ).length] );
             obj.pose=pose;
             obj.pose_p=a;
+            obj.calcMetricPose();
         end;
         
         function obj=resample(obj)
@@ -200,7 +205,6 @@ classdef ParticleLocalization < TopologicalLocalization
                 if obj.h_part(J) ~= 0
                     delete(obj.h_part(J));
                 end;
-                
                 if isempty(obj.map.nextNodes(obj.particles(J).id))
                     obj.h_part(J)=plot(obj.map.nodes(obj.particles(J).id).gps(2),obj.map.nodes(obj.particles(J).id).gps(1),'-gx', 'MarkerSize', 8, 'LineWidth',1);
                 else
@@ -214,6 +218,10 @@ classdef ParticleLocalization < TopologicalLocalization
                 end;
                 
             end;
+            if obj.h_mp ~= 0
+                delete(obj.h_mp);
+            end;
+            obj.h_mp=plot(obj.metric_pose(2),obj.metric_pose(1),'-kx', 'MarkerSize', 12, 'LineWidth',2);
             
             if obj.h_pos ~= 0
                 delete(obj.h_pos)
@@ -225,14 +233,79 @@ classdef ParticleLocalization < TopologicalLocalization
             end;
             
         end;
-        
-        function obj=particlesReset(obj)
-            for I=1:length(obj.particles)
-                obj.particles(I).id=randi(length(obj.map.nodes));
-                obj.particles(I).length=rand * obj.map.nodes(obj.particles(I).id).d;
-                obj.particles(I).weight=1;
+        function calcMetricPose(obj)
+            obj.metric_pose=obj.map.nodes(obj.particles(1).id).gps*0;
+            tmpw=0;
+            for J=1:length(obj.particles)
+                if isempty(obj.map.nextNodes(obj.particles(J).id))
+                    %if obj.particles(J).id == obj.pose.id
+                    temp_gps=obj.map.nodes(obj.particles(J).id).gps;
+                    obj.metric_pose = obj.metric_pose + temp_gps*obj.particles(J).weight;
+                    tmpw=tmpw+obj.particles(J).weight;
+                    %end
+                else
+                    nid=obj.map.nextNodes(obj.particles(J).id);
+                    nid=nid(1);
+                    if obj.map.nodes(obj.particles(J).id).d == 0
+                        ratio=0;
+                    else
+                        ratio=obj.particles(J).length/obj.map.nodes(obj.particles(J).id).d;
+                    end;
+                    temp_gps=obj.map.nodes(obj.particles(J).id).gps*(1-ratio)+obj.map.nodes(nid).gps*ratio;
+                    %if obj.particles(J).id == obj.pose.id
+                        obj.metric_pose = obj.metric_pose + temp_gps*obj.particles(J).weight;
+                        tmpw=tmpw+obj.particles(J).weight;
+                    %end
+                end;
             end;
-            obj.normalize_weights();
+            obj.metric_pose=obj.metric_pose/tmpw;
+            %return;
+            tmp_p=obj.map.nodes(obj.particles(1).id).gps;
+            tmp_d=lldistkm(tmp_p,obj.metric_pose);
+            tmpw=0;
+            tmpp=tmp_p*0;
+            for J=2:length(obj.particles)
+                if isempty(obj.map.nextNodes(obj.particles(J).id))
+                    temp_gps=obj.map.nodes(obj.particles(J).id).gps;
+                else
+                    nid=obj.map.nextNodes(obj.particles(J).id);
+                    nid=nid(1);
+                    if obj.map.nodes(obj.particles(J).id).d == 0
+                        ratio=0;
+                    else
+                        ratio=obj.particles(J).length/obj.map.nodes(obj.particles(J).id).d;
+                    end;
+                    temp_gps=obj.map.nodes(obj.particles(J).id).gps*(1-ratio)+obj.map.nodes(nid).gps*ratio;
+                end;
+                if  obj.particles(J).id ~= obj.pose.id
+                %    continue;
+                end;
+                current_p=temp_gps;
+                current_d=lldistkm(current_p,obj.metric_pose);
+                if current_d<0.03
+                    tmpw=tmpw+obj.particles(J).weight;
+                    tmpp = tmpp + temp_gps*obj.particles(J).weight;
+                end;
+                if tmp_d > current_d
+                    tmp_d=current_d;
+                    tmp_p=obj.map.nodes(obj.particles(J).id).gps;
+                end;
+            end;
+            obj.metric_pose=tmp_p;
+            obj.metric_pose=tmpp/tmpw;
+        end;
+        function obj=particlesReset(obj)
+            cumulative=cumsum([obj.map.nodes(:).d]);
+            for I=1:length(obj.particles)
+                r=cumulative(end)*I/length(obj.particles);
+                nid=find( r >= cumulative,1,'last');
+                if isempty(nid)
+                    nid=1;
+                end;
+                obj.particles(I).id=nid;
+                obj.particles(I).length=r-cumulative(nid);
+                obj.particles(I).weight=1/length(obj.particles);
+            end;
         end;
     end
     

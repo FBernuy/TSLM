@@ -1,13 +1,13 @@
 clear
 load('fcfm_M2.mat')
 load('fcfm_M3.mat')
-param=[0.3,1,0,5];
+param=[0.3,1500,0,5];
 
 param1=[0.00001,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8];
-REC_VID=false;
+REC_VID=true;
 GET_ERR=true;
 N_ITER=1;
-DISPLAY_FREQ=6000;
+DISPLAY_FREQ=1;
 USE_ORIENTED=true;
 
 performance=[];
@@ -30,7 +30,7 @@ clf;
 
 hold on
 h_map=GTSM.display();
-%plot_google_map
+ plot_google_map('MapType', 'roadmap','ShowLabels',0)
 set(gca,'position',[0 0 1 1],'units','normalized');
 h_pos=0;
 hold on
@@ -51,6 +51,7 @@ hold on
     end;
     
     poses=zeros(1,length(feats)); conf=zeros(1,length(poses));
+    metric_poses=zeros(2,length(feats));
     DO=[];
     local_map_len=param(3);
     if local_map_len==0                                                         %param3: Local Map Length, 0 for direct obs (0.5)
@@ -98,6 +99,7 @@ hold on
             dist=0;
             poses(I)=temp_pose.id;
             mean_len=temp_pose.length;
+            metric_poses(:,I)=PF.metric_pose;
             conf(I)=PF.pose_p;%DO.likelihood(GTSM,poses(I),mean_len);
             cc=conf(I);
             if I>30*param(4)
@@ -120,6 +122,7 @@ hold on
                 delete(h_loc);
                 %        delete(h_locgt);
             end;
+            
             if local_map_len==0                                                         %param3: Local Map Length, 0 for direct obs (0.5)
                 if ~USE_ORIENTED
                     DO=DirectObservation(SemanticFeature());
@@ -233,3 +236,34 @@ hold on
         
     end;
 end;
+
+save('pf_fcfm_gps.mat',metric_poses)
+
+
+%% Visualizacion metrica
+figure(2)
+hold on
+load('../orient-fcfm-gps.mat')
+plot(metric_poses(2,5:5:end),metric_poses(1,5:5:end),'-g', 'LineWidth',2);
+load('lost_fcfm.mat')
+plot(lost_gps_out(:,2),lost_gps_out(:,1), '-b','LineWidth',2)
+load('pf_fcfm_gps.mat')
+plot(metric_poses(2,5:5:end),metric_poses(1,5:5:end),'-r', 'LineWidth',2);
+hold on
+mygps=[];
+for KK=5:5:length(feats)
+    mygps=[mygps feats(KK).gps'];
+end;
+plot(mygps(2,:),mygps(1,:), '-k','LineWidth',2)
+plot_google_map('MapType', 'roadmap','ShowLabels',0)
+set(gca,'position',[0 0 1 1],'units','normalized');
+hold off
+for JJ=5:5:length(metric_poses)
+    metric_dist(JJ)=lldistkm(metric_poses(:,JJ),feats(JJ).gps);
+end;
+figure(3);
+plot(metric_dist(5:5:end))
+mean(metric_dist(5:5:end))
+mean(metric_dist(5:5:end)>0.02)
+mean(metric_dist(5:5:end)>0.025)
+mean(metric_dist(5:5:end)>0.03)

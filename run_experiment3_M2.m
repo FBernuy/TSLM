@@ -1,15 +1,15 @@
 clear
 load('fcfm_M2.mat')
 load('fcfm_M3.mat')
-param=[0.2,1,0,5];
+param=[0.3,2000,0,5];
 
 err=[];
 
 param1=[0.00001,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8];
 REC_VID=false;
 GET_ERR=true;
-N_ITER=1;
-DISPLAY_FREQ=10;
+N_ITER=500;
+DISPLAY_FREQ=6000;
 USE_ORIENTED=true;
 
 feats=addFeatureOrientation(fcfm_M3);
@@ -51,18 +51,7 @@ parfor it=1:N_ITER
         PF=ParticleLocalization(npart, GTSM, init_prob);
         
         %distribuir particulas:
-        cumulative=cumsum([PF.map.nodes(:).d]);
-        for I=1:length(PF.particles)
-            r=cumulative(end)*I/length(PF.particles);
-            nid=find( r >= cumulative,1,'last');
-            if isempty(nid)
-                nid=1;
-            end;
-            PF.particles(I).id=nid;
-            PF.particles(I).length=r-cumulative(nid);
-            PF.particles(I).weight=1/length(PF.particles);
-        end;
-        
+        PF.particlesReset();
     end;
     
     poses=zeros(1,length(feats)); conf=zeros(1,length(poses));
@@ -91,6 +80,7 @@ parfor it=1:N_ITER
     cc=0;
     kk=0;
     init_point=randi(round(length(feats)*3/4),1);
+    reset_point=init_point;
     for I=init_point:length(feats)
         clc;display('Localization');
         %T
@@ -102,8 +92,6 @@ parfor it=1:N_ITER
         if ~rem(I,param(4))                                                            %param4: Localization frequency, each N frames (5)
             I
             kk
-            if I==110
-            end;
             %cc;
             tic;
             temp_pose=PF.update(DO,dist);
@@ -115,11 +103,11 @@ parfor it=1:N_ITER
             conf(I)=DO.likelihood(GTSM,poses(I),mean_len);
             cc=conf(I);
             if isa(PF,'ParticleLocalization')
-            if I>30*param(4)
-                if mean(conf(I-29*param(4):param(4):I))<0.5
-                    %PF.particlesReset();
+                if I-reset_point>200*param(4)
+                    reset_point=I;
+                    PF.particlesReset();
+                    
                 end;
-            end;
             end;
             
             if isa(PF,'ForwardLocalization')
@@ -144,7 +132,7 @@ parfor it=1:N_ITER
                     break;
            %     else
                 end;
-                if I-init_point>3000
+                if I>=length(feats)-param(4)
                     err(it)=[NaN];
                     derr(it)=sum([feats(init_point:I).d]);
                     derr2(it)=min(tmp_dists);
